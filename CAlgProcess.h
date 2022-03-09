@@ -24,7 +24,7 @@ public:
                                                                   // void SendFaceDetResult(FaceDetResult fdResResult);
     void SendFaceRegResult(FaceRegResult faceRegResult);
     void SendClassifierResult(ClassResult classRes); 
-    void SendYoloV5Result(YoloV5Result yolov5Res);
+    void SendYoloV5Result(YoloV5Result yolov5Res, iDpType);
     void SetCallBack(LPAlgAlarmResCallBack lpAlarmRes, LPAlgInfoResCallBack lpInfoRes, LPAlgReDetCallBack lpReDetRes, void *userdata);
 };
 
