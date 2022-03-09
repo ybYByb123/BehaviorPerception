@@ -236,5 +236,6 @@ enum YOLOV5_OBJECT_TYPE
 	HANDSONWAIST,//11-叉腰
 	HANDTELEPHONE//12-打电话
 };
+///////
 
 #endif
