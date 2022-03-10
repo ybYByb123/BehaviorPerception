@@ -3,9 +3,9 @@ Mat cut_img = ori_image(rect);
 
 
 // 2. 抽烟打电话，人脸识别，截取上半身区域
-rect.x = rect.x - rect.width/2 ? 0 : rect.x - rect.width/2>0;
+rect.x = rect.x - rect.width/2>0 ? rect.x - rect.width/2 : 0;
 rect.height /= 2;
-rect.width = rect.width*2 ? ori_image.cols-rect.x+1 : rect.x+rect.width*2<ori_image.cols;
+rect.width =  rect.x+rect.width*2<ori_image.cols ? rect.width*2:ori_image.cols-rect.x+1;
 Mat cut_img = ori_image(rect);
 
 
