@@ -12,14 +12,14 @@ using namespace std;
 
 #define PIC_NUM 5
 
-/*typedef struct tagFaceDetResult{
+typedef struct tagFaceDetResult{
     cv::Rect rctTgt;     // 人脸框坐标
     vector<cv::Point> landmarks; // 人脸五个关键点
     cv::Mat face_img; // 矫正后的人脸图片
     char szCamID[64];
 	int64_t iTimeStamp;
     char szTime[32];
-}FaceDetResult;*/
+}FaceDetResult;
 
 typedef struct tagRegInfo
 {
@@ -48,11 +48,32 @@ typedef struct tagClassResult
     char szCamID[64];
     int64_t iTimeStamp;
     char szTime[32];
-    int iType;
+    int iType; // 与ImgUnit中iDetType保持一致
 } ClassResult;
 
-typedef struct tagAlarm
+typedef struct tagTgtRes
 {
+    cv::Rect rctRes;
+    int iType;
+    float fConf;
+}TgtRes;
+
+typedef struct tagYoloV5Res
+{
+	cv::Rect rctTgt; // 原目标框位置
+	vector<TgtRes> tgtRes;
+}YoloV5Res;
+
+typedef struct tagYoloV5Result
+{
+	char szCamID[64];
+	char szTime[32];
+	int64_t iTimeStamp;
+	vector<YoloV5Res> yolov5Res;	
+}YoloV5Result;
+
+typedef struct tagAlarm
+{    
     int iType; //报警类型 0-人数不足 2-瞭望缺失 3-缺岗 4-区域巡逻 5-安全帽 6-工作服 7-抽烟 8-火灾 9-区域入侵
     cv::Rect rctTgt;
     int64_t iTimeStamp;
@@ -86,7 +107,8 @@ typedef struct tagImgUnit
     char szCamID[64];
     int64_t iTimeStamp;
     char szTime[32];
-    cv::Mat imgMat;
+    // maskrcnn中对应的是需要检测的图像(小图)，无需截图  yolov5、人脸检测需要截取对应框再扩展部分区域 分类器需根据框的位置截取
+    cv::Mat imgMat; 
     // iDetType 0-不校正 1-maskrcnn 瞭望校正 2-maskrcnn人校正 3-yolov5打电话识别  4-yolov5抽烟识别 5-安全帽分类器 6-工作服分类器 7-人脸检测 8-人脸识别
     int iDetType;
     vector<cv::Rect> rctTgt;

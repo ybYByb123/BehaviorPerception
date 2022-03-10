@@ -23,7 +23,8 @@ public:
     void SendDeepLearnResult(DeepLearnResult dlRes, int iDpType); // 发送深度学习检测结果到算法模块
                                                                   // void SendFaceDetResult(FaceDetResult fdResResult);
     void SendFaceRegResult(FaceRegResult faceRegResult);
-    void SendClassifierResult(ClassResult classRes); // iType 0-带安全帽 1-没带安全帽 2-穿工作服 3-没穿工作服
+    void SendClassifierResult(ClassResult classRes); 
+    void SendYoloV5Result(YoloV5Result yolov5Res, int iDpType);
     void SetCallBack(LPAlgAlarmResCallBack lpAlarmRes, LPAlgInfoResCallBack lpInfoRes, LPAlgReDetCallBack lpReDetRes, void *userdata);
 };
 

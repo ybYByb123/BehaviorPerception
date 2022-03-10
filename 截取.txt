@@ -6,6 +6,6 @@ Mat cut_img = ori_image(rect);
 rect.x = rect.x - rect.width/2>0 ? rect.x - rect.width/2 : 0;
 rect.height /= 2;
 rect.width =  rect.x+rect.width*2<ori_image.cols ? rect.width*2:ori_image.cols-rect.x+1;
-Mat cut_img = ori_image(rect);
+
 
 
