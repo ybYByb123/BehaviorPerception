@@ -1,12 +1,15 @@
 #ifndef _AFX_ALG_VARIABLES_H_
 #define _AFX_ALG_VARIABLES_H_
 
-#include <stdlib.h>
+#include <cstdlib>
 #include <unistd.h>
 #include <string>
 #include <vector>
 #include <opencv2/opencv.hpp>
 #include "PublicVariables.h"
+#include "LogFile.h"
+
+extern CLogFile m_LogFile;
 
 using namespace std;
 
@@ -17,7 +20,7 @@ typedef struct tagFaceDetResult{
     vector<cv::Point> landmarks; // 人脸五个关键点
     cv::Mat face_img; // 矫正后的人脸图片
     char szCamID[64];
-	int64_t iTimeStamp;
+    int64_t iTimeStamp;
     char szTime[32];
 }FaceDetResult;
 
@@ -60,22 +63,22 @@ typedef struct tagTgtRes
 
 typedef struct tagYoloV5Res
 {
-	cv::Rect rctTgt; // 原目标框位置
-	vector<TgtRes> tgtRes;
+    cv::Rect rctTgt; // 原目标框位置
+    vector<TgtRes> tgtRes;
 }YoloV5Res;
 
 typedef struct tagYoloV5Result
 {
-	char szCamID[64];
-	char szTime[32];
-	int64_t iTimeStamp;
-	vector<YoloV5Res> yolov5Res;	
+    char szCamID[64];
+    char szTime[32];
+    int64_t iTimeStamp;
+    vector<YoloV5Res> yolov5Res;
 }YoloV5Result;
 
 typedef struct tagAlarm
-{    
+{
     int iType; //报警类型 0-人数不足 2-瞭望缺失 3-缺岗 4-区域巡逻 5-安全帽 6-工作服 7-抽烟 8-火灾 9-区域入侵
-    cv::Rect rctTgt;
+    vector<cv::Rect> rctTgt;
     int64_t iTimeStamp;
     char szTime[32];
     char szImgPath[PIC_NUM][128];
@@ -89,7 +92,8 @@ typedef struct tagAlarm
 
 typedef struct tagInfo
 {
-    int iType;     //实时消息类型 0-人数， 1-身份识别结果
+    int iType;     //实时消息类型 10-人数， 11-身份识别结果
+    vector<cv::Rect> rctTgt;
     int personNum; // 人数
     int64_t iTimeStamp;
     char szTime[32];
@@ -108,7 +112,7 @@ typedef struct tagImgUnit
     int64_t iTimeStamp;
     char szTime[32];
     // maskrcnn中对应的是需要检测的图像(小图)，无需截图  yolov5、人脸检测需要截取对应框再扩展部分区域 分类器需根据框的位置截取
-    cv::Mat imgMat; 
+    cv::Mat imgMat;
     // iDetType 0-不校正 1-maskrcnn 瞭望校正 2-maskrcnn人校正 3-yolov5打电话识别  4-yolov5抽烟识别 5-安全帽分类器 6-工作服分类器 7-人脸检测 8-人脸识别
     int iDetType;
     vector<cv::Rect> rctTgt;
@@ -131,5 +135,4 @@ typedef struct tagImgUnit
 typedef void (*LPAlgAlarmResCallBack)(Alarm alarmRes, void *userData);
 typedef void (*LPAlgInfoResCallBack)(Info infoRes, void *userData);
 typedef void (*LPAlgReDetCallBack)(ImgUnit imgUnit, void *userData);
-
 #endif
