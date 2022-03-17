@@ -71,7 +71,7 @@ bool FunGroup1::Initial(vector<FunIni> &funInis, CallbackInit callbackInit) {
         // 记录每个camera的ROI
         if (funIni.iAeraType != 0)
             mapCamRoi[make_pair(funIni.camid, funIni.iAeraType)] = funIni.areaRois;
-        for (int i = 0; i < 5; ++i) {
+        for (int i = 0; i < 6; ++i) {
             if (thisfuns[i] == funid){
                 strcpy(alarmStatus.camid, funIni.camid);
                 alarmStatus.funid = funIni.funid;
@@ -201,27 +201,6 @@ bool FunGroup3::Initial(vector<FunIni> &funInis, CallbackInit callbackInit) {
             else
                 mapCaptain[funIni.iCamType].push_back(funIni.camid);
         }
-
-        if (funid == 9){
-            // 区域入侵
-            strcpy(alarmStatus.camid, funIni.camid);
-            alarmStatus.funid = funIni.funid;
-            alarmStatus.reportStatus = 0;
-            alarmStatus.alarm.iType = funid;
-            memcpy(alarmStatus.alarm.szCamID, funIni.camid, sizeof(char )*64);
-            memcpy(alarmStatus.alarm.szDevId, funIni.szDevId, sizeof(char )*32);
-            alarmStatus.alarm.iDetArea = funIni.iCamType;
-            alarmStatus.alarm.ilevel = LEVEL[funid];
-            alarmStatus.alarm.iPicNum = 1;
-            alarmStatus.oriMat.reserve(1);
-            mapRoiInvadeAlarm[funIni.camid] = alarmStatus;
-
-            if (mapRoiInvade.find(funIni.iCamType) != mapRoiInvade.end())
-                mapRoiInvade[funIni.iCamType] = {funIni.camid};
-            else
-                mapRoiInvade[funIni.iCamType].push_back(funIni.camid);
-        }
-
         if (funid == 11){
             // 人脸识别结果上报
             strcpy( infoStatus.camid, funIni.camid);
@@ -294,6 +273,8 @@ void FunGroup1::SendAlgInput(AlgInput algInput) {
         workcloth(algInput);
     else if (algInput.funid == 6 or algInput.funid==7 and smokephone_on)
         smoke_phone(algInput);
+    else if (algInput.funid == 9)
+        roiInvade(algInput);
 }
 
 void FunGroup1::helmat(const AlgInput& algInput) {
@@ -597,6 +578,38 @@ void FunGroup1::SendClassifierResult(ClassResult& classRes) {
 
 void FunGroup1::roiInvade(AlgInput algInput) {
     // todo:实现区域入侵报警
+    auto iter = mapFunAlarms[5].find(algInput.camid);
+    auto iter_roi = mapCamRoi.find(make_pair(algInput.camid, 2));
+    if (iter != mapFunAlarms[5].end()){
+        for(auto &dpres: algInput.detres){
+            if (dpres.iType == 2){
+                // todo:应当根据摄像头角度确定根据哪个点，确定是否在区域内
+                // 右下角的点
+                cv::Point_<int> right_down(dpres.rctTgt.x+dpres.rctTgt.width, dpres.rctTgt.y+dpres.rctTgt.height);
+                if (IsInRoi(iter_roi->second, right_down)){
+                    // 有人入侵区域，产生报警
+                    iter->second.alarm.rctTgt.push_back(dpres.rctTgt);
+                }
+            }
+        }
+        if (!iter->second.alarm.rctTgt.empty()){
+            iter->second.alarm.iTimeStamp = algInput.iTimeStamp;
+            iter->second.alarm.iRegionType = algInput.iRegionType;
+            strcpy(iter->second.alarm.szTime, algInput.szTime);
+            string camidS = iter->second.camid;
+            string image_save_path = EVENTIMAGEPATH+ camidS + "_" + algInput.szTime+ "_RoiInvade.jpg";
+            image_save_path.copy(iter->second.alarm.szImgPath[0], 128, 0);
+            display(algInput.image, iter->second.alarm.rctTgt, (string &) "RoiInvade");
+            cv::imwrite(image_save_path, algInput.image);
+            CONVAR.wait(MUTEX, []() { return CALLBACKABLE[0]; });
+            CALLBACKABLE[0] = false;
+            m_AlarmRes(iter->second.alarm, m_userData);
+            CONVAR.notify_one();
+            iter->second.reportStatus = 0;
+            iter->second.alarm.rctTgt.clear();
+        }
+    }else
+        m_LogFile.TraceWarning("Camid: %s没有初始化区域入侵功能", algInput.camid);
 
 }
 

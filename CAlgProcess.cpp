@@ -133,6 +133,16 @@ void CALGProcess::SetAlgPara(ConfigParaStruct cps, char *szEventPath) {
         } //todo:以后可能还有其他地点加入
 
 
+        // 区域入侵，有区域入侵roi的划分
+        if (areas.find(2) != areas.end()){
+            funIni.funid = 9;
+            funIni.areaRois = areas.find(2)->second;
+            funIni.iAeraType = 2;
+            thiscamfuns.push_back(9);
+            funinis_1.push_back(funIni);
+        }
+
+
         /*记录每个区域与相机id的对应关系
         auto iter = MAPTYPECAMID.find(m_CamType);
         if (iter != MAPTYPECAMID.end()){
@@ -232,11 +242,11 @@ void *CALGProcess::InferProcess(void *arg) {
             if (fun_time[i].first and (fun_time[i].second - algInput.iTimeStamp) / 1000 >= FRENQUENCY[i]){
                 algInput.funid = i;
                 fun_time[i].second = thistime;
-                if (i==3 or i==4 or i==5 or i==6 or i==7)
+                if (i==3 or i==4 or i==5 or i==6 or i==7 or i==9)
                     p->funGroup1->SendAlgInput(algInput);
                 if (i==0 or i==10)
                     p->funGroup2->SendAlgInput(algInput);
-                if (i==11 or i==2 or i==9)
+                if (i==11 or i==2)
                     p->funGroup3->SendAlgInput(algInput);
                 if (i==1 or i==8)
                     p->funGroup4->SendAlgInput(algInput);
