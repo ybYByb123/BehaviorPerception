@@ -196,10 +196,7 @@ bool FunGroup3::Initial(vector<FunIni> &funInis, CallbackInit callbackInit) {
             alarmStatus.oriMat.reserve(3);
             mapCaptainAlarm[funIni.camid] = alarmStatus;
 
-            if (mapCaptain.find(funIni.iCamType) != mapCaptain.end())
-                mapCaptain[funIni.iCamType] = {funIni.camid};
-            else
-                mapCaptain[funIni.iCamType].push_back(funIni.camid);
+            CaptainCams.push_back(funIni.camid);
         }
         if (funid == 11){
             // 人脸识别结果上报
@@ -262,6 +259,14 @@ bool FunGroup4::Initial(vector<FunIni> &funInis, CallbackInit callbackInit) {
 
         }
     }
+}
+
+void FunGroup4::SendMrcnnResult(DeepLearnResult mrcnnRes) {
+
+}
+
+void FunGroup4::SendAlgInput(AlgInput algInput) {
+    BaseFunProcess::SendAlgInput(algInput);
 }
 
 void FunGroup1::SendAlgInput(AlgInput algInput) {
@@ -884,6 +889,12 @@ void FunGroup2::SendMrcnnResult(DeepLearnResult mrcnnRes) {
 void FunGroup3::SendAlgInput(AlgInput algInput) {
     auto iter = mapIdInfo.find(algInput.camid);
     iter->second.info.iRegionType = algInput.iRegionType;
+
+    // 跟新船长缺席报警中，船只所在区域，因为只有在这里才传进来
+    auto iter_captain = mapCaptainAlarm.find(algInput.camid);
+    if (iter_captain != mapCaptainAlarm.end())
+        iter_captain->second.alarm.iRegionType = algInput.iRegionType;
+
     auto iter_trackids = mapCamTrackid.find(algInput.camid);
     if(iter_trackids->second.size() >= 1000)
         iter_trackids->second.clear(); // 记录200次跟踪结果
@@ -918,14 +929,14 @@ void FunGroup3::SendAlgInput(AlgInput algInput) {
 
 void FunGroup3::SendFaceRecoRes(FaceRegResult faceRegResult) {
     auto iter = mapIdInfo.find(faceRegResult.szCamID);
-    auto iter_cap_vector = mapCaptain.find(iter->second.info.iDetArea)->second;
+    auto iter_captian = mapCaptainAlarm.find(faceRegResult.szCamID);
     bool meet_captain = false;
     if (iter->second.info.iTimeStamp == faceRegResult.iTimeStamp){
         // 是同一个时间戳下的二次验证结果
         if (!faceRegResult.regInfo.empty()){
             for(auto &reginfo:faceRegResult.regInfo){
                 // 判断是否有船长
-                if ( std::find(iter_cap_vector.begin(), iter_cap_vector.end(), iter->second.camid) != iter_cap_vector.end()
+                if ( iter_captian != mapCaptainAlarm.end()
                 and strcmp(reginfo.szPID, "船长") == 0){
                     auto iter_roi = mapCamRoi.find(make_pair(iter->second.camid, 1));
                     cv::Point_<int> middle(reginfo.rctTgt.x+reginfo.rctTgt.width/2, reginfo.rctTgt.y+reginfo.rctTgt.height/2);
@@ -952,7 +963,46 @@ void FunGroup3::SendFaceRecoRes(FaceRegResult faceRegResult) {
             }
         }
     }
-    // todo:2022-3-16船长缺席报警
+    // 船长缺席报警
+    if (meet_captain){
+        // 所有相机下记录的船长缺席状态都清零
+        for(auto & cplack: mapCamCaptainLackTime)
+            cplack.second = 0;
+        for(auto &ctcplack: mapCamTimeCaptainLack)
+            ctcplack.second.clear();
+        for(auto &ca:mapCaptainAlarm){
+            ca.second.reportStatus = 0;
+            ca.second.oriMat.clear();
+        }
+    }else{
+        auto camid = faceRegResult.szCamID;
+        auto iter_camtime = mapCamTimeCaptainLack.find(camid);
+        auto iter_camlack = mapCamCaptainLackTime.find(camid);
+        if (iter_captian->second.reportStatus == 0){
+            // 这个相机下第一次记录到船长缺席
+            assert(iter_camtime->second.empty());
+            iter_camtime->second.push_back(faceRegResult.szTime);
+            iter_camlack->second = 0;
+            iter_captian->second.reportStatus = 2;
+            iter_captian->second.oriMat.push_back(iter->second.oriMat);
+        }else{
+            iter_camlack->second += FRENQUENCY[11];
+            if (int(captian_alarm_time*60/iter_camlack->second)==2 and iter_captian->second.oriMat.size()==1){
+                iter_captian->second.oriMat.push_back(iter->second.oriMat);
+                iter_camtime->second.push_back(faceRegResult.szTime);
+            }
+            if (iter_camlack->second > captian_alarm_time*60 and iter_captian->second.oriMat.size() == 2){
+                // 周期结束一张图
+                iter_captian->second.oriMat.push_back(iter->second.oriMat);
+                iter_camtime->second.push_back(faceRegResult.szTime);
+                iter_captian->second.reportStatus = 1; // 状态置于等待报警状态
+                strcpy(iter_captian->second.alarm.szTime, faceRegResult.szTime);
+                iter_captian->second.alarm.iTimeStamp = faceRegResult.iTimeStamp;
+
+                // todo: 联合多个相机判断船长是否缺席
+            }
+        }
+    }
 }
 
 

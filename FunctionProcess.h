@@ -46,7 +46,7 @@ public:
 
     virtual bool Initial(vector<FunIni> &funInis, CallbackInit callbackInit);
 
-    virtual void SendAlgInput(AlgInput algInput) {};
+    virtual void SendAlgInput(AlgInput algInput);
 
     virtual ~BaseFunProcess() = default;
 
@@ -186,8 +186,7 @@ public:
 
 private:
     // 多摄像头联动
-    map<int, vector<char *>> mapCaptain; // 2-船长缺席
-    map<int, vector<char *>> mapRoiInvade; // 9-区域入侵
+    vector<char *> CaptainCams; // 记录区域内那些摄像头需要记录船长缺席
 
     // 上报初始化
     map<char*, AlarmStatus> mapCaptainAlarm;
