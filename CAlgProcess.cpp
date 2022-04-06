@@ -144,14 +144,16 @@ void CALGProcess::SetAlgPara(ConfigParaStruct cps, char *szEventPath) {
 
 
         /*记录每个区域与相机id的对应关系
-        auto iter = MAPTYPECAMID.find(m_CamType);
-        if (iter != MAPTYPECAMID.end()){
+        auto iter = mapTypeCam.find(m_CamType);
+        if (iter != mapTypeCam.end()){
             iter->second.push_back(camera_id);
         }else{
             vector<char*> camera_ids;
             camera_ids.push_back(camera_id);
-            MAPTYPECAMID.insert({m_CamType, camera_ids});
+            mapTypeCam.insert({m_CamType, camera_ids});
         }*/
+
+        mapCamType[camera_id] = m_CamType;
         //相机id与功能模块的对应关系，检测时间，存储到mapCamfunTime字典中
         bool tag;
         auto iter_1 = mapCamFunTime.find(camera_id);
@@ -175,8 +177,8 @@ void CALGProcess::SetAlgPara(ConfigParaStruct cps, char *szEventPath) {
             reinterpret_cast<LPAlgAlarmResCallBack>(GetAlarmCallBack),
             reinterpret_cast<LPAlgInfoResCallBack>(GetInfoCallBack),
             reinterpret_cast<LPAlgReDetCallBack>(GetAlgReDetCallBack),
-            nullptr
-    };
+            this};
+
     funGroup1->Initial(funinis_1, callbackInit);
     funGroup2->Initial(funinis_2, callbackInit);
     funGroup3->Initial(funinis_3, callbackInit);
@@ -238,6 +240,11 @@ void *CALGProcess::InferProcess(void *arg) {
         auto iter = p->mapCamFunTime.find(p->algInput.camid);
         auto fun_time = iter->second;  //这个相机下的功能和上次取到结果的时间戳
 
+        // 火灾一旦检测到就需要连续检测
+        if (fun_time[8].first and ((fun_time[8].second - algInput.iTimeStamp) / 1000 >= FRENQUENCY[8]
+        or p->funGroup4->mapFireGetFre[p->mapCamType[algInput.camid]]==1))
+            p->funGroup4->SendAlgInput(algInput);
+
         for (int i = 0; i < fun_time.size(); ++i) {
             if (fun_time[i].first and (fun_time[i].second - algInput.iTimeStamp) / 1000 >= FRENQUENCY[i]){
                 algInput.funid = i;
@@ -248,7 +255,7 @@ void *CALGProcess::InferProcess(void *arg) {
                     p->funGroup2->SendAlgInput(algInput);
                 if (i==11 or i==2)
                     p->funGroup3->SendAlgInput(algInput);
-                if (i==1 or i==8)
+                if (i==1)
                     p->funGroup4->SendAlgInput(algInput);
             }
         }
@@ -266,18 +273,24 @@ void CALGProcess::SetCallBack(LPAlgAlarmResCallBack lpAlarmRes, LPAlgInfoResCall
     m_userData = userdata;
 }
 
-void CALGProcess::GetAlarmCallBack(const Alarm& alarmRes, void *userData) {
-    m_AlarmRes(alarmRes, userData);
+void CALGProcess::GetAlarmCallBack(const Alarm &alarmRes, void *userData)
+{
+    CALGProcess *pThis = (CALGProcess *)userData;
+    pThis->m_AlarmRes(alarmRes, pThis->m_userData);
     CALLBACKABLE[0] = true;
 }
 
-void CALGProcess::GetInfoCallBack(const Info& infoRes, void *userData) {
-    m_InfoRes(infoRes, userData);
+void CALGProcess::GetInfoCallBack(const Info &infoRes, void *userData)
+{
+    CALGProcess *pThis = (CALGProcess *)userData;
+    pThis->m_InfoRes(infoRes, pThis->m_userData);
     CALLBACKABLE[1] = true;
 }
 
-void CALGProcess::GetAlgReDetCallBack(const ImgUnit& imgUnit, void *userData) {
-    m_AlgDet(imgUnit, userData);
+void CALGProcess::GetAlgReDetCallBack(const ImgUnit &imgUnit, void *userData)
+{
+    CALGProcess *pThis = (CALGProcess *)userData;
+    pThis->m_AlgDet(imgUnit, pThis->m_userData);
     CALLBACKABLE[2] = true;
 }
 
@@ -387,7 +400,8 @@ void CALGProcess::SetRegionInfo(vector<vector<string>> vecRegInfo) //0-regiontyp
         else
             funGroup3->captain_in_position  = false;
         funGroup2->num_thresh = atoi(m_vecAlarmRules[0][2].c_str()); //人数不足报警阈值
-        funGroup4->look_out_interval = atoi(m_vecAlarmRules[0][3].c_str()) * 60; // 瞭望间隔
+        funGroup4->look_out_interval = atoi(m_vecAlarmRules[0][3].c_str()); // 瞭望间隔
+        funGroup3->captian_alarm_time = atoi(m_vecAlarmRules[0][5].c_str());
         // m_nTimeLen.bNeedJudgePirate = atoi(m_vecAlarmRules[0][4].c_str()); 海盗刺
     }
     else //在特殊区域
@@ -401,6 +415,7 @@ void CALGProcess::SetRegionInfo(vector<vector<string>> vecRegInfo) //0-regiontyp
             {
                 funGroup3->captain_in_position = true;
                 // todo: 应当传入船长连续在岗最小时间要求
+                funGroup3->captian_alarm_time = atoi(m_vecAlarmRules[0][5].c_str());
             }
 
             int nPersonNum = atoi(m_vecAlarmRules[i.nId][2].c_str()); //本区域驾驶台人数阈值
@@ -409,8 +424,8 @@ void CALGProcess::SetRegionInfo(vector<vector<string>> vecRegInfo) //0-regiontyp
                 funGroup2->num_thresh = nPersonNum;
             }
 
-            int nLookTimeLen = atoi(m_vecAlarmRules[i.nId][3].c_str()) * 60; //瞭望
-            if (nLookTimeLen < funGroup4->look_out_interval)                                       //找到驾驶台人数最小值
+            int nLookTimeLen = atoi(m_vecAlarmRules[i.nId][3].c_str()); //瞭望
+            if (nLookTimeLen < funGroup4->look_out_interval)               //找到驾驶台人数最小值
             {
                 funGroup4->look_out_interval = nLookTimeLen;
             }

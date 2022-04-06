@@ -226,6 +226,7 @@ bool FunGroup4::Initial(vector<FunIni> &funInis, CallbackInit callbackInit) {
             mapCamRoi[make_pair(funIni.camid, funIni.iAeraType)] = funIni.areaRois;
 
         if (funid == 1){
+            // 瞭望
             strcpy(alarmStatus.camid, funIni.camid);
             alarmStatus.funid = funIni.funid;
             alarmStatus.reportStatus = 0;
@@ -238,13 +239,11 @@ bool FunGroup4::Initial(vector<FunIni> &funInis, CallbackInit callbackInit) {
             alarmStatus.oriMat.reserve(3);
             mapLookoutAlarm[funIni.camid] = alarmStatus;
 
-            if (mapLookout.find(funIni.iCamType) != mapLookout.end())
-                mapLookout[funIni.iCamType] = {funIni.camid};
-            else
-                mapLookout[funIni.iCamType].push_back(funIni.camid);
+            LookoutCams.push_back(funIni.camid);
         }
 
         if (funid == 8){
+            // 火灾
             strcpy(alarmStatus.camid, funIni.camid);
             alarmStatus.funid = funIni.funid;
             alarmStatus.reportStatus = 0;
@@ -256,17 +255,13 @@ bool FunGroup4::Initial(vector<FunIni> &funInis, CallbackInit callbackInit) {
             alarmStatus.alarm.iPicNum = 1;
             alarmStatus.oriMat.reserve(1);
             mapFireAlarm[funIni.camid] = alarmStatus;
-
+            auto iter = mapFireCams.find(funIni.iCamType);
+            if (iter == mapFireCams.end())
+                mapFireCams[funIni.iCamType].push_back(funIni.camid);
+            else
+                iter->second.push_back(funIni.camid);
         }
     }
-}
-
-void FunGroup4::SendMrcnnResult(DeepLearnResult mrcnnRes) {
-
-}
-
-void FunGroup4::SendAlgInput(AlgInput algInput) {
-    BaseFunProcess::SendAlgInput(algInput);
 }
 
 void FunGroup1::SendAlgInput(AlgInput algInput) {
@@ -420,7 +415,7 @@ void FunGroup1::roiround(AlgInput algInput) {
                 auto areaROI = mapCamRoi.find(make_pair(algInput.camid, 2))->second;
                 auto rect = algInput.detres[i].rctTgt;
                 cv::Point_<int> middle_point(rect.x+rect.width/2, rect.y+rect.height/2);
-                if(IsInRoi(areaROI, middle_point)){
+                if(algprocess::IsInRoi(areaROI, middle_point)){
                     meet = true;
                     break;
                 }
@@ -491,7 +486,7 @@ void FunGroup1::SendYoloV5Result(YoloV5Result yolov5Res, int iDpType) {
                 }
             }
             if (isAlarm){
-                display(iter->second.oriMat[0], iter->second.alarm.rctTgt, txt);
+                algprocess::display(iter->second.oriMat[0], iter->second.alarm.rctTgt, txt);
                 string camidS = iter->second.camid;
                 string image_save_path = EVENTIMAGEPATH+camidS + "_" + iter->second.alarm.szTime + "_"+txt+".jpg";
                 cv::imwrite(image_save_path, iter->second.oriMat[0]);
@@ -530,7 +525,7 @@ void FunGroup1::SendClassifierResult(ClassResult& classRes) {
             if (isAlarm){
                 // 有安全帽的报警
                 // 将框show在原图上并保存，上传报警
-                display(iter->second.oriMat[0], iter->second.alarm.rctTgt, txt);
+                algprocess::display(iter->second.oriMat[0], iter->second.alarm.rctTgt, txt);
                 string camidS = iter->second.camid;
                 string image_save_path = EVENTIMAGEPATH+camidS + "_" + iter->second.alarm.szTime + "_"+txt+".jpg";
                 cv::imwrite(image_save_path, iter->second.oriMat[0]);
@@ -564,7 +559,7 @@ void FunGroup1::SendClassifierResult(ClassResult& classRes) {
                 if (isAlarm){
                     // 有安全帽的报警
                     // 将框show在原图上并保存，上传报警
-                    display(iter->second.oriMat[0], iter->second.alarm.rctTgt, (string &) "No workcloth");
+                    algprocess::display(iter->second.oriMat[0], iter->second.alarm.rctTgt, (string &) "No workcloth");
                     string camidS = iter->second.camid;
                     string image_save_path = EVENTIMAGEPATH+camidS + "_" + iter->second.alarm.szTime + "_NoWorkCloth.jpg";
                     cv::imwrite(image_save_path, iter->second.oriMat[0]);
@@ -591,7 +586,7 @@ void FunGroup1::roiInvade(AlgInput algInput) {
                 // todo:应当根据摄像头角度确定根据哪个点，确定是否在区域内
                 // 右下角的点
                 cv::Point_<int> right_down(dpres.rctTgt.x+dpres.rctTgt.width, dpres.rctTgt.y+dpres.rctTgt.height);
-                if (IsInRoi(iter_roi->second, right_down)){
+                if (algprocess::IsInRoi(iter_roi->second, right_down)){
                     // 有人入侵区域，产生报警
                     iter->second.alarm.rctTgt.push_back(dpres.rctTgt);
                 }
@@ -604,7 +599,7 @@ void FunGroup1::roiInvade(AlgInput algInput) {
             string camidS = iter->second.camid;
             string image_save_path = EVENTIMAGEPATH+ camidS + "_" + algInput.szTime+ "_RoiInvade.jpg";
             image_save_path.copy(iter->second.alarm.szImgPath[0], 128, 0);
-            display(algInput.image, iter->second.alarm.rctTgt, (string &) "RoiInvade");
+            algprocess::display(algInput.image, iter->second.alarm.rctTgt, (string &) "RoiInvade");
             cv::imwrite(image_save_path, algInput.image);
             CONVAR.wait(MUTEX, []() { return CALLBACKABLE[0]; });
             CALLBACKABLE[0] = false;
@@ -638,7 +633,7 @@ void FunGroup2::SendAlgInput(AlgInput algInput) {
                 cv::Point_<int> middle(detre.rctTgt.x+detre.rctTgt.width/2, detre.rctTgt.y+detre.rctTgt.height/2);
                 if (detre.iType==2){
                     if (iter_roi != mapCamRoi.end()){
-                        if (IsInRoi(iter_roi->second, middle)){
+                        if (algprocess::IsInRoi(iter_roi->second, middle)){
                             person_count += 1;
                             iter->second.info.rctTgt.push_back(detre.rctTgt);
                         }
@@ -650,7 +645,7 @@ void FunGroup2::SendAlgInput(AlgInput algInput) {
                 /*统计头的数量
                 if (detre.iType==3){
                     if (iter_roi != mapCamRoi.end()){
-                        if (IsInRoi(iter_roi->second, middle)){
+                        if (algprocess::IsInRoi(iter_roi->second, middle)){
                             head_count += 1;
                         }
                     }else head_count += 1;
@@ -763,7 +758,7 @@ void FunGroup2::SendAlgInput(AlgInput algInput) {
             if (std::find(all_equal.begin(), all_equal.end(), false) == all_equal.end()){
                 // 每个相机下的人数全部都是相同的，不需要二次验证，即是最终人数，上报消息
                 // 保存图像
-//                display(algInput.image, iter->second.info.rctTgt, (string &) "person_count");
+//                algprocess::display(algInput.image, iter->second.info.rctTgt, (string &) "person_count");
                 string camidS = iter->second.camid;
                 string image_save_path = EVENTIMAGEPATH+camidS + "_" + iter->second.info.szTime + "_"+"person_count.jpg";
                 image_save_path.copy(iter->second.info.szImgPath, 128, 0);
@@ -940,15 +935,16 @@ void FunGroup3::SendFaceRecoRes(FaceRegResult faceRegResult) {
                 and strcmp(reginfo.szPID, "船长") == 0){
                     auto iter_roi = mapCamRoi.find(make_pair(iter->second.camid, 1));
                     cv::Point_<int> middle(reginfo.rctTgt.x+reginfo.rctTgt.width/2, reginfo.rctTgt.y+reginfo.rctTgt.height/2);
-                    if (IsInRoi(iter_roi->second, middle))
+                    if (algprocess::IsInRoi(iter_roi->second, middle))
                         meet_captain = true;
                 }
+                // 上报一个实时身份检测的消息
                 iter->second.info.rctTgt.clear();
                 iter->second.info.rctTgt.push_back(reginfo.rctTgt);
                 strcpy(iter->second.info.szPID, reginfo.szPID);
                 strcpy(iter->second.info.szPName, reginfo.szPName);
                 cv::Mat image = iter->second.oriMat.clone();
-                display(image, iter->second.info.rctTgt , reinterpret_cast<string &>(reginfo.szPName));
+                algprocess::algprocess::display(image, iter->second.info.rctTgt , reinterpret_cast<string &>(reginfo.szPName));
                 string camidS = iter->second.camid;
                 string image_save_path = EVENTIMAGEPATH+ camidS + "_" + iter->second.info.szTime+ "_NoRoiRound.jpg";
                 image_save_path.copy(iter->second.info.szImgPath, 128, 0);
@@ -964,42 +960,285 @@ void FunGroup3::SendFaceRecoRes(FaceRegResult faceRegResult) {
         }
     }
     // 船长缺席报警
-    if (meet_captain){
-        // 所有相机下记录的船长缺席状态都清零
-        for(auto & cplack: mapCamCaptainLackTime)
-            cplack.second = 0;
-        for(auto &ctcplack: mapCamTimeCaptainLack)
-            ctcplack.second.clear();
-        for(auto &ca:mapCaptainAlarm){
-            ca.second.reportStatus = 0;
-            ca.second.oriMat.clear();
-        }
-    }else{
-        auto camid = faceRegResult.szCamID;
-        auto iter_camtime = mapCamTimeCaptainLack.find(camid);
-        auto iter_camlack = mapCamCaptainLackTime.find(camid);
-        if (iter_captian->second.reportStatus == 0){
-            // 这个相机下第一次记录到船长缺席
-            assert(iter_camtime->second.empty());
-            iter_camtime->second.push_back(faceRegResult.szTime);
-            iter_camlack->second = 0;
-            iter_captian->second.reportStatus = 2;
-            iter_captian->second.oriMat.push_back(iter->second.oriMat);
-        }else{
-            iter_camlack->second += FRENQUENCY[11];
-            if (int(captian_alarm_time*60/iter_camlack->second)==2 and iter_captian->second.oriMat.size()==1){
-                iter_captian->second.oriMat.push_back(iter->second.oriMat);
-                iter_camtime->second.push_back(faceRegResult.szTime);
+    if (captain_in_position){
+        if (meet_captain){
+            // 所有相机下记录的船长缺席状态都清零
+            for(auto & cplack: mapCamCaptainLackTime)
+                cplack.second = 0;
+            for(auto &ctcplack: mapCamTimeCaptainLack)
+                ctcplack.second.clear();
+            for(auto &ca:mapCaptainAlarm){
+                ca.second.reportStatus = 0;
+                ca.second.oriMat.clear();
             }
-            if (iter_camlack->second > captian_alarm_time*60 and iter_captian->second.oriMat.size() == 2){
-                // 周期结束一张图
-                iter_captian->second.oriMat.push_back(iter->second.oriMat);
+        }else{
+            auto camid = faceRegResult.szCamID;
+            auto iter_camtime = mapCamTimeCaptainLack.find(camid);
+            auto iter_camlack = mapCamCaptainLackTime.find(camid);
+            if (iter_captian->second.reportStatus == 0){
+                // 这个相机下第一次记录到船长缺席
+                assert(iter_camtime->second.empty());
                 iter_camtime->second.push_back(faceRegResult.szTime);
-                iter_captian->second.reportStatus = 1; // 状态置于等待报警状态
-                strcpy(iter_captian->second.alarm.szTime, faceRegResult.szTime);
-                iter_captian->second.alarm.iTimeStamp = faceRegResult.iTimeStamp;
+                iter_camlack->second = 0;
+                iter_captian->second.reportStatus = 2;
+                iter_captian->second.oriMat.push_back(iter->second.oriMat);
+            }else{
+                iter_camlack->second += FRENQUENCY[11];
+                if (int(captian_alarm_time*60/iter_camlack->second)==2 and iter_captian->second.oriMat.size()==1){
+                    iter_captian->second.oriMat.push_back(iter->second.oriMat);
+                    iter_camtime->second.push_back(faceRegResult.szTime);
+                }
+                if (iter_camlack->second > captian_alarm_time*60 and iter_captian->second.oriMat.size() == 2){
+                    // 周期结束一张图
+                    iter_captian->second.oriMat.push_back(iter->second.oriMat);
+                    iter_camtime->second.push_back(faceRegResult.szTime);
+                    iter_captian->second.reportStatus = 1; // 状态置于等待报警状态
+                    strcpy(iter_captian->second.alarm.szTime, faceRegResult.szTime);
+                    iter_captian->second.alarm.iTimeStamp = faceRegResult.iTimeStamp;
 
-                // todo: 联合多个相机判断船长是否缺席
+                    // 联合多个相机判断船长是否缺席
+                    bool cpAlarm=false;
+                    for(auto &cpcam: CaptainCams){
+                        auto iter_cpalarm = mapCaptainAlarm.find(cpcam);
+                        if (iter_cpalarm != mapCaptainAlarm.end()){
+                            if (iter_cpalarm->second.reportStatus == 1)
+                                cpAlarm = true;
+                            else
+                                break;
+                        }
+                    }
+
+                    // 所有相机都检测到周期内船长不在岗，则产生报警
+                    if (cpAlarm){
+                        assert(iter_captian->second.oriMat.size()==3);
+                        for (int i = 0; i < 3; ++i) {
+                            string camidS = iter_captian->second.camid;
+                            string image_save_path = EVENTIMAGEPATH+ camidS + "_" + iter_camtime->second[i]+ "_NoCaptain.jpg";
+                            image_save_path.copy(iter_captian->second.alarm.szImgPath[i], 128, 0);
+                            cv::imwrite(image_save_path, iter_captian->second.oriMat[i]);
+                        }
+                        CONVAR.wait(MUTEX, []() { return CALLBACKABLE[0]; });
+                        CALLBACKABLE[0] = false;
+                        m_AlarmRes(iter_captian->second.alarm, m_userData);
+                        CONVAR.notify_one();
+                        iter_captian->second.reportStatus = 0;
+                        iter_captian->second.oriMat.clear();
+                        // 产生船长报警后清空所有相机下的记录
+                        for(auto &cpcam: CaptainCams){
+                            auto iter_cpalarm = mapCaptainAlarm.find(cpcam);
+                            if (iter_cpalarm != mapCaptainAlarm.end()){
+                                iter_cpalarm->second.oriMat.clear();
+                                iter_cpalarm->second.reportStatus = 0;
+                            }
+                            auto iter_cplack = mapCamCaptainLackTime.find(cpcam);
+                            if (iter_cplack != mapCamCaptainLackTime.end())
+                                iter_cplack->second = 0;
+
+                            auto iter_cptlack = mapCamTimeCaptainLack.find(cpcam);
+                            if (iter_cptlack != mapCamTimeCaptainLack.end())
+                                iter_cptlack->second.clear();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+}
+
+
+void FunGroup4::SendMrcnnResult(DeepLearnResult mrcnnRes) {
+    // 回传瞭望消息
+    bool meet = false;
+    auto iter = mapLookoutAlarm.find(mrcnnRes.szCamID);
+    if (iter != mapLookoutAlarm.end() and strcmp(iter->second.alarm.szTime, mrcnnRes.szTime)==0){
+        for (auto &dpres:mrcnnRes.vDpResult) {
+            if (dpres.iType == 1){
+                meet = true;
+                break;
+            }
+        }
+
+        if (meet){
+            // 有瞭望结果,则清空相关联摄像头下的所有瞭望记录
+            for (auto cams:LookoutCams) {
+                auto iter_c = mapLookoutAlarm.find(cams);
+                iter_c->second.reportStatus = 0;
+                iter_c->second.oriMat.clear();
+                // 清空时间记录
+                auto iter_time = mapCamTimeLookout.find(cams);
+                iter_time->second.clear();
+                auto iter_lotime = mapLookoutLackTime.find(cams);
+                iter_lotime->second = 0;
+            }
+        }else{
+            // 没有瞭望结果，则更新当前相机时间点的记录
+            auto iter_time = mapCamTimeLookout.find(mrcnnRes.szCamID);
+            auto iter_lotime = mapLookoutLackTime.find(mrcnnRes.szCamID);
+            if (iter->second.reportStatus == 0){
+                // 首次记录
+                assert(iter_time->second.empty());
+                iter_time->second.push_back(mrcnnRes.szTime);
+                iter->second.oriMat.push_back(mrcnnRes.imgMat);
+                iter->second.reportStatus = 2;
+                iter_lotime->second = 0;
+            }else{
+                iter_lotime->second += FRENQUENCY[1];
+                if (int(look_out_interval*60/iter_lotime->second)==2 and iter->second.oriMat.size()==1){
+                    iter->second.oriMat.push_back(mrcnnRes.imgMat);
+                    iter_time->second.push_back(mrcnnRes.szTime);
+                }
+                if (iter_lotime->second > look_out_interval*60 and iter->second.oriMat.size() == 2){
+                    // 周期结束一张图
+                    iter->second.oriMat.push_back(mrcnnRes.imgMat);
+                    iter_time->second.push_back(mrcnnRes.szTime);
+                    iter->second.reportStatus = 1; // 状态置于等待报警状态
+                    strcpy(iter->second.alarm.szTime, mrcnnRes.szTime);
+                    iter->second.alarm.iTimeStamp = mrcnnRes.iTimeStamp;
+
+                    // 联合多个相机判断船长是否缺席
+                    bool cpAlarm=false;
+                    for(auto &cpcam: LookoutCams){
+                        auto iter_cpalarm = mapLookoutAlarm.find(cpcam);
+                        if (iter_cpalarm != mapLookoutAlarm.end()){
+                            if (iter_cpalarm->second.reportStatus == 1)
+                                cpAlarm = true;
+                            else
+                                break;
+                        }
+                    }
+
+                    // 所有相机都检测到周期内船长不在岗，则产生报警
+                    if (cpAlarm){
+                        assert(iter->second.oriMat.size()==3);
+                        for (int i = 0; i < 3; ++i) {
+                            string camidS = iter->second.camid;
+                            string image_save_path = EVENTIMAGEPATH+ camidS + "_" + iter_time->second[i]+ "_NoLookout.jpg";
+                            image_save_path.copy(iter->second.alarm.szImgPath[i], 128, 0);
+                            cv::imwrite(image_save_path, iter->second.oriMat[i]);
+                        }
+                        CONVAR.wait(MUTEX, []() { return CALLBACKABLE[0]; });
+                        CALLBACKABLE[0] = false;
+                        m_AlarmRes(iter->second.alarm, m_userData);
+                        CONVAR.notify_one();
+                        iter->second.reportStatus = 0;
+                        iter->second.oriMat.clear();
+                        // 产生船长报警后清空所有相机下的记录
+                        for(auto &cpcam: LookoutCams){
+                            auto iter_cpalarm = mapLookoutAlarm.find(cpcam);
+                            if (iter_cpalarm != mapLookoutAlarm.end()){
+                                iter_cpalarm->second.oriMat.clear();
+                                iter_cpalarm->second.reportStatus = 0;
+                            }
+                            auto iter_cplack = mapLookoutLackTime.find(cpcam);
+                            if (iter_cplack != mapLookoutLackTime.end())
+                                iter_cplack->second = 0;
+
+                            auto iter_cptlack = mapCamTimeLookout.find(cpcam);
+                            if (iter_cptlack != mapCamTimeLookout.end())
+                                iter_cptlack->second.clear();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void FunGroup4::SendAlgInput(AlgInput algInput) {
+    if (algInput.funid == 1 and lookout_on)
+        lookout(algInput);
+    else if (algInput.funid == 8 and fire_on)
+        fire(algInput);
+}
+
+void FunGroup4::lookout(AlgInput algInput) {
+    auto iter = mapLookoutAlarm.find(algInput.camid);
+    if (iter != mapLookoutAlarm.end()){
+        iter->second.alarm.iRegionType = algInput.iRegionType;
+        // todo: 主检测器瞭望没用，所以直接掺入maskrcnn进行瞭望检测
+        iter->second.reportStatus=1;
+        iter->second.oriMat.push_back(algInput.image.clone());
+        strcpy(iter->second.alarm.szTime, algInput.szTime);
+        iter->second.alarm.iTimeStamp = algInput.iTimeStamp;
+        ImgUnit imgUnit;
+        strcpy(imgUnit.szCamID, algInput.camid);
+        strcpy(imgUnit.szTime, algInput.szTime);
+        imgUnit.imgMat = algInput.image.clone();
+        imgUnit.iDetType = 1;
+        imgUnit.iTimeStamp = algInput.iTimeStamp;
+        CONVAR.wait(MUTEX, []() { return CALLBACKABLE[2]; });
+        CALLBACKABLE[2] = false;
+        m_AlgDet(imgUnit, m_userData); // 回调出去，需要进行安全帽分类验证
+        CONVAR.notify_one();
+    }
+}
+
+void FunGroup4::fire(AlgInput algInput) {
+    auto iter = mapFireAlarm.find(algInput.camid);
+    if (iter != mapFireAlarm.end() and iter->second.reportStatus != 1){
+        // 尚且没有火灾报警等待上传
+        bool has_fire = false;
+        iter->second.alarm.iRegionType = algInput.iRegionType;
+        for (auto &dpres:algInput.detres) {
+            if (dpres.iType == 14){
+                has_fire = true;
+                break;
+            }
+        }
+        auto iter_fcounts = mapFireCounts.find(algInput.camid);
+        auto iter_fgfre = mapFireGetFre.find(iter->second.alarm.iDetArea);
+        auto iter_relcams = mapFireCams.find(iter->second.alarm.iDetArea);
+        if (has_fire){
+            iter_fcounts->second += 1;
+            // 火灾报警采集频率
+            if (iter_fcounts->second == 10){
+                iter->second.reportStatus = 1;
+                iter_fgfre->second = 0; // 采集频率置于0
+            }
+            else{
+                iter->second.reportStatus = 2; // 等连续帧的确定
+                iter_fgfre->second = 1; // 需要每一秒获取一帧，连续测试10帧
+            }
+        }else{
+            // 没有火这个类，则清空现有的记录,包括关联相机
+            if (iter->second.reportStatus == 2){
+                for (auto cam:iter_relcams->second) {
+                    iter_fcounts = mapFireCounts.find(cam);
+                    iter_fgfre->second = 0;
+                }
+                iter_fcounts->second = 0;
+            }
+        }
+        bool alarm_fire =true;
+        if (iter->second.reportStatus == 1){
+            // 查看所有相关联的相机是都是等待上报消息的状态
+            for(auto cam:iter_relcams->second){
+                auto iter_alarm = mapFireAlarm.find(cam);
+                if (iter_alarm->second.reportStatus != 1){
+                    alarm_fire = false;
+                    break;
+                }
+            }
+            if (alarm_fire){
+                //上报火灾消息
+                string camidS = iter->second.camid;
+                string image_save_path = EVENTIMAGEPATH+ camidS + "_" + iter->second.alarm.szTime+ "_Fire.jpg";
+                image_save_path.copy(iter->second.alarm.szImgPath[0], 128, 0);
+                cv::imwrite(image_save_path, iter->second.oriMat[0]);
+                CONVAR.wait(MUTEX, []() { return CALLBACKABLE[0]; });
+                CALLBACKABLE[0] = false;
+                m_AlarmRes(iter->second.alarm, m_userData);
+                CONVAR.notify_one();
+                // 清空当前火灾记录
+                iter_fgfre->second = 0;
+                iter->second.reportStatus = 0;
+                for(auto cam:iter_relcams->second){
+                    auto iter_alarm = mapFireAlarm.find(cam);
+                    iter_alarm->second.reportStatus = 0;
+                    iter_alarm->second.alarm.rctTgt.clear();
+                    iter_alarm->second.oriMat.clear();
+                }
             }
         }
     }

@@ -208,19 +208,28 @@ public:
     FunGroup4() = default;
     bool Initial(vector<FunIni> &funInis, CallbackInit callbackInit) override;
     void SendAlgInput(AlgInput algInput) override;
-
     void SendMrcnnResult(DeepLearnResult mrcnnRes);
-
     int look_out_interval = 60; //瞭望产生报警时间要求（分钟）
     // 是否需要检测火灾
     bool fire_on = true;
+    bool lookout_on = true;
+    map<int, int> mapFireGetFre;
 
 private:
     // 需要联合测试的相机
-    map<int, vector<char *>> mapLookout; // 1-瞭望
+    vector<char *> LookoutCams; // 瞭望联合测试相机
+    map<int, vector<char *>> mapFireCams; // 火灾联合测试相机（分区域）
+    map<char *, int> mapFireCounts; // 每个相机确认到火灾的次数
     map<char*, AlarmStatus> mapFireAlarm;
     map<char*, AlarmStatus> mapLookoutAlarm;
 
+    // 周期性功能时间，开始、中间、结束三个时间点
+    // 多个相机下瞭望情况
+    map<char*, vector<char*>> mapCamTimeLookout;// 记录每个相机周期性的三个时间点
+    map<char*, int> mapLookoutLackTime; // 记录每个相机周期记录时间
+
+    void lookout(AlgInput algInput);
+    void fire(AlgInput algInput);
 };
 
 #endif //CABINBEHAVIORPERCEPTION_FUNCTIONPROCESS_H

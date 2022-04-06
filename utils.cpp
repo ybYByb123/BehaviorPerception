@@ -4,7 +4,7 @@
 
 #include "utils.h"
 
-bool IsInRoi(const vector<cv::Point_<int>> &roi, const cv::Point_<int> &point) {
+bool algprocess::IsInRoi(const vector<cv::Point_<int>> &roi, const cv::Point_<int> &point) {
     if (cv::pointPolygonTest(roi, point, false) > 0)
         return true;
     else
@@ -13,7 +13,7 @@ bool IsInRoi(const vector<cv::Point_<int>> &roi, const cv::Point_<int> &point) {
 
 
 //输入为2020-11-24 17:07:32格式时间，输出为时间戳
-time_t Time2StampTime(const std::string &strTime, int iType) {
+time_t algprocess::Time2StampTime(const std::string &strTime, int iType) {
     struct tm tm{};
     memset(&tm, 0, sizeof(tm));
     if (iType == 0 || iType == 3 || iType == 5) {
@@ -35,7 +35,7 @@ time_t Time2StampTime(const std::string &strTime, int iType) {
     return mktime(&tm);
 }
 
-bool display(cv::Mat &image, vector<cv::Rect_<int>> rects, string &txt){
+bool algprocess::display(cv::Mat &image, vector<cv::Rect_<int>> rects, string &txt){
     for (const auto& rect: rects) {
         cv::rectangle(image, rect, cv::Scalar_<int>(0, 0, 255), 2);
     }
